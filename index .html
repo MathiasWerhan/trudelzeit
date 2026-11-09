@@ -489,7 +489,42 @@ for(let offset=0;offset<=7;offset++){
  }
 }
 future.sort((a,b)=>a._nextAt-b._nextAt);
-const next=future[0]||null;$('time').textContent=fmt(n);$('status').textContent=(simActive?'🎬 Simulation · ':(data.test?'🧪 Testmodus · ':''))+names[d]+' · '+({school:'🎒 Schulwoche',holiday:'🌈 Ferien',custom:'🌻 Freie Woche'}[data.mode]);$('now').textContent=active?(active.kind==='away'?'🏫 Unterwegs – viel Spaß!':active.emoji+' '+active.name):'🌿 Freie Zeit';$('range').textContent=active?(isSleep?active.start+' – '+active.end+' Uhr · Noch '+Math.floor((active._end-n)/60)+' Std. '+String((active._end-n)%60).padStart(2,'0')+' Min.':active.start+' – '+active.end+' Uhr'):'Gerade ist nichts geplant.';$('next').textContent=next?next.emoji+' '+next.name:'🌳 Kein weiterer Programmpunkt';$('nexttime').textContent=next?next.start+' Uhr':'';let svg=`${data.visualTheme==='nature'?`<defs>
+let next=future[0]||null;
+// Overnight schedules: the next card must show the first activity after sleep,
+// even when the following day's plan is missing and a weekly template is used.
+if(isSleep){
+  const sleepEnd=active._end;
+  const endDayOffset=Math.floor(sleepEnd/1440);
+  const endMinute=((sleepEnd%1440)+1440)%1440;
+  const wakeCandidates=[];
+  for(let offset=endDayOffset;offset<endDayOffset+14;offset++){
+    const planDay=(d+offset+700)%7;
+    for(const item of (data.plans[data.mode][planDay]||[])){
+      if(!item.start||!item.name)continue;
+      const absoluteStart=offset*1440+min(item.start);
+      if(absoluteStart>=sleepEnd && item.id!==active.id){
+        wakeCandidates.push({...item,_nextAt:absoluteStart});
+      }
+    }
+  }
+  wakeCandidates.sort((a,b)=>a._nextAt-b._nextAt);
+  if(wakeCandidates.length)next=wakeCandidates[0];
+  // If the next weekday was not filled in yet, use the matching wake-up
+  // activity from another configured weekday as an explicit schedule preview.
+  if(!next){
+    const morning=[];
+    for(const weekday of (data.plans[data.mode]||[])){
+      for(const item of (weekday||[])){
+        if(item.start&&item.name&&/aufstehen|anziehen/i.test(item.name)){
+          morning.push(item);
+        }
+      }
+    }
+    morning.sort((a,b)=>min(a.start)-min(b.start));
+    if(morning.length)next=morning[0];
+  }
+}
+$('time').textContent=fmt(n);$('status').textContent=(simActive?'🎬 Simulation · ':(data.test?'🧪 Testmodus · ':''))+names[d]+' · '+({school:'🎒 Schulwoche',holiday:'🌈 Ferien',custom:'🌻 Freie Woche'}[data.mode]);$('now').textContent=active?(active.kind==='away'?'🏫 Unterwegs – viel Spaß!':active.emoji+' '+active.name):'🌿 Freie Zeit';$('range').textContent=active?(isSleep?active.start+' – '+active.end+' Uhr · Noch '+Math.floor((active._end-n)/60)+' Std. '+String((active._end-n)%60).padStart(2,'0')+' Min.':active.start+' – '+active.end+' Uhr'):'Gerade ist nichts geplant.';$('next').textContent=next?next.emoji+' '+next.name:'🌳 Kein weiterer Programmpunkt';$('nexttime').textContent=next?next.start+' Uhr':'';let svg=`${data.visualTheme==='nature'?`<defs>
 <!-- The same warm, horizontal wood bands and palette used by the text boards. -->
 <pattern id="oakBoardWood" width="500" height="82" patternUnits="userSpaceOnUse">
 <rect width="500" height="82" fill="#ffe7b6"/>
